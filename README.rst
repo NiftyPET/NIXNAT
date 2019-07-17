@@ -1,5 +1,5 @@
 ========================================================
-NI-XNAT: IMAGE TRANSFER USING PYCURL SUBROUTINES
+NI-XNAT: Image transfers using PyCurl in Python 3.7+
 ========================================================
 
 .. image:: https://readthedocs.org/projects/niftypet/badge/?version=latest
