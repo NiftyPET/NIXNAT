@@ -16,8 +16,8 @@ import platform
 # PYTHON SETUP
 #===============================================================
 
-print 'i> found those packages:'
-print find_packages(exclude=['docs'])
+print('i> found those packages:')
+print(find_packages(exclude=['docs']))
 
 with open('README.rst') as file:
     long_description = file.read()
@@ -27,7 +27,7 @@ with open('README.rst') as file:
 setup(
     name='nixnat',
     license = 'Apache 2.0',
-    version='1.0.0',
+    version='0.1.0',
     description='XNAT input/output.',
     long_description=long_description,
     author='Pawel J. Markiewicz',
