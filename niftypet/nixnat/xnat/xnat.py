@@ -10,7 +10,6 @@ import platform
 import numpy as np
 import math
 import pydicom as dcm
-import nibabel as nib
 
 
 #--------------

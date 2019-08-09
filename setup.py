@@ -34,7 +34,7 @@ setup(
     author_email='p.markiewicz@ucl.ac.uk',
     url='https://github.com/pjmark/NiftyPET',
     keywords='XNAT input output',
-    install_requires=[],
+    install_requires=['pydicom'],
     packages=find_packages(exclude=['docs']),
     zip_safe=False,
 )
