@@ -11,10 +11,17 @@ from stat import *
 from . import xnat
 
 
+def create_dir(pth):
+    if not os.path.exists(pth):    
+        os.makedirs(pth)
+
+
 def setup_access(outpath='', fcrdntls='xnat.json'):
 
     if not os.path.isdir(outpath):
         outpath = os.path.join( os.path.expanduser('~'), '.niftypet')
+
+    create_dir(outpath)
 
     prj = input('ia> enter below the name of the XNAT project:\n')
     prj = prj.strip()
@@ -33,6 +40,7 @@ def setup_access(outpath='', fcrdntls='xnat.json'):
     xc['url'] = url
     xc['usrpwd'] = usrpsswd
     xc['sbj'] = sbj
+
 
     #> export the user and server data to a JSON file
     fnm = os.path.join(outpath, fcrdntls)

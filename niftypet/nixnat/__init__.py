@@ -9,6 +9,7 @@ from .xnat import xnat
 
 from .xnat.iofun import setup_access
 from .xnat.iofun import establish_connection
+from .xnat.iofun import create_dir
 
 
 from .xnat.xnat import get_list
