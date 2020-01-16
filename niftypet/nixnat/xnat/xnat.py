@@ -20,6 +20,28 @@ from io import StringIO
 from datetime import datetime
 #--------------
 
+#-------------------------------------------------------------------------------
+# LOGGING
+#-------------------------------------------------------------------------------
+import logging
+
+#> console handler
+ch = logging.StreamHandler()
+formatter = logging.Formatter(
+    '\n%(levelname)s> %(asctime)s - %(name)s - %(funcName)s\n> %(message)s'
+    )
+ch.setFormatter(formatter)
+logging.getLogger(__name__).addHandler(ch)
+
+def get_logger(name):
+    return logging.getLogger(name)
+
+#> default log level (10-debug, 20-info, ...)
+log_default = logging.WARNING
+#-------------------------------------------------------------------------------
+
+
+
 # DICOM extensions
 dcm_ext = ('dcm', 'DCM', 'ima', 'IMA')
 
@@ -31,21 +53,40 @@ def create_dir(pth):
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
-def time_stamp():
+def time_stamp(simple_ascii=False):
     now    = datetime.now()
-    nowstr = str(now.year)+'-'+str(now.month)+'-'+str(now.day)+' '+str(now.hour)+':'+str(now.minute)
+    if simple_ascii:
+        nowstr = str(now.year)+'-'+str(now.month)+'-'+str(now.day)+'_'+str(now.hour)+'h'+str(now.minute)
+    else:
+        nowstr = str(now.year)+'-'+str(now.month)+'-'+str(now.day)+' '+str(now.hour)+':'+str(now.minute)
     return nowstr
 # ------------------------------------------------------------------------------
 
 
 # ------------------------------------------------------------------------------
-def dcminfo(dcmvar, verbose=True):
+def dcminfo(dcmvar, verbose=False, Cnt=None):
     ''' Get basic info about the DICOM file/header.
     '''
 
+    #> check if the dictionary of constant is given
+    if Cnt is None:
+        Cnt = {}
+
+    #-------------------------------------------
+    #> set the logger and its level of verbose
+    log = get_logger(__name__)
+
+    if 'LOG' not in Cnt and verbose>=1:
+        log.setLevel(logging.INFO)
+    elif 'LOG' in Cnt:
+        log.setLevel(Cnt['LOG'])
+    else:
+        log.setLevel(log_default)
+    #-------------------------------------------
+
+
     if isinstance(dcmvar, str):
-        if verbose:
-            print('i> provided DICOM file:', dcmvar)
+        log.info('provided DICOM file:', dcmvar)
         dhdr = dcm.dcmread(dcmvar)
     elif isinstance(dcmvar, dict):
         dhdr = dcmvar
@@ -53,8 +94,7 @@ def dcminfo(dcmvar, verbose=True):
         dhdr = dcmvar
 
     dtype   = dhdr[0x08, 0x08].value
-    if verbose:
-        print('   Image Type:', dtype)
+    log.info('Image Type:', dtype)
 
     #-------------------------------------------
     #> scanner ID
@@ -75,25 +115,23 @@ def dcminfo(dcmvar, verbose=True):
     csatype = ''
     if [0x29, 0x1108] in dhdr:
         csatype = dhdr[0x29, 0x1108].value
-        if verbose:
-            print('   CSA Data Type:', csatype)
+        log.info('CSA Data Type:', csatype)
 
     #> DICOM comment or on MR parameters
     cmmnt   = ''
     if [0x20, 0x4000] in dhdr:
         cmmnt = dhdr[0x0020, 0x4000].value
-        if verbose:
-            print('   Comments:', cmmnt)
+        log.info('Comments:', cmmnt)
 
     #> MR parameters (echo time, etc) 
     TR = 0
     TE = 0
     if [0x18, 0x80] in dhdr:
         TR = float(dhdr[0x18, 0x80].value)
-        if verbose: print('   TR:', TR)
+        log.info('TR:', TR)
     if [0x18, 0x81] in dhdr:
         TE = float(dhdr[0x18, 0x81].value)
-        if verbose: print('   TE:', TE)
+        log.info('TE:', TE)
 
 
     #> check if it is norm file
@@ -177,7 +215,18 @@ def get_data(xnaturi, frmt='json', cookie='', usrpwd=''):
         output = json.loads( buff.getvalue() )
     return output
 
-def get_file(xnaturi, fname, cookie='', usrpwd=''):
+def get_file(xnaturi, fname, cookie='', usrpwd='', Cnt=None):
+
+    #> check if the dictionary of constant is given
+    if Cnt is None:
+        Cnt = {}
+
+    #-------------------------------------------
+    #> set the logger and its level of verbose
+    log = get_logger(__name__)
+    log.setLevel(Cnt.get('LOG', log_default))
+    #-------------------------------------------
+
     try:
         fn = open(fname, 'wb')
         c = pycurl.Curl()
@@ -204,17 +253,15 @@ def get_file(xnaturi, fname, cookie='', usrpwd=''):
         w> no data.
 
         '''
-
-        print(a)
+        log.error(a)
         return -1
 
     else:
         a = f'''
-        -------------------------
-        i> pycurl download done.
-        -------------------------
+        \rpycurl download done.
+        \r---------------------
         '''
-        print(a)
+        log.info(a)
     return 0
 #----------------------------------------------------------------------------------------------------------
 
@@ -324,14 +371,45 @@ def getscan(
         dformat = ['DICOM', 'NIFTI'],
         outpath = '',
         fcomment = '',
+        Cnt=None,
+        info_only=False,
+        output_quality=True,
         #close_session=True,
         ):
 
+    '''
+        expt:  XNAT experiment as a dictionary or string (ID or label)
+    '''
 
-    if not cookie:
+    #> check if the dictionary of constant is given
+    if Cnt is None:
+        Cnt = {}
+
+    #-------------------------------------------
+    #> set the logger and its level of verbose
+    log = get_logger(__name__)
+    log.setLevel(Cnt.get('LOG', log_default))
+    #-------------------------------------------
+
+
+    if not cookie and 'cookie' not in xc:
         sessionID = post_data(xc['url']+'/data/JSESSIONID', '', usrpwd=xc['usrpwd'])
         cookie = 'JSESSIONID='+sessionID
+        log.warning('using a new session/cookie for this XNAT connection.')
+    elif not cookie and 'cookie' in xc:
+        cookie = xc['cookie']
 
+    #>------------------------------------------
+    #> input for experiment
+    if isinstance(expt, str):
+        expid = expt
+    elif isinstance(expt, dict):
+        expid = expt['ID']
+    #>------------------------------------------
+
+
+    #>------------------------------------------
+    #> input for scan
     if isinstance(scan_types, str):
         scan_types = [scan_types]
 
@@ -340,27 +418,30 @@ def getscan(
 
     if isinstance(dformat, str):
         dformat = [dformat]
+    #>------------------------------------------
+
 
     #> output dictionary
     out = {}
     out['cookie'] = cookie
 
     if outpath=='':
-        if os.path.isdir(xc['opth']):
+        if 'opth' in xc and os.path.isdir(xc['opth']):
             opth = xc['opth']
         else:
             if platform.system() in ['Linux', 'Darwin']:
-                opth = os.path.join(os.path.expanduser('~'), 'xnat_scans')
+                opth = os.path.join(os.path.expanduser('~'), 'XNATscans')
             elif platform.system() == 'Windows' :
-                opth = os.path.join(os.getenv('LOCALAPPDATA'), 'xnat_scans')
+                opth = os.path.join(os.getenv('LOCALAPPDATA'), 'XNATscans')
             else:
                 raise IOError('e> unknown system and no output folder provided!')
     else:
         opth = outpath
 
+    log.info('using this output path: {}.'.format(opth))
 
     scans = get_list(
-        xc['sbjs']+'/' +sbjix+ '/experiments/' + expt['ID'] + '/scans',
+        xc['sbj']+'/' +sbjix+ '/experiments/' + expid + '/scans',
         cookie=cookie
     )
 
@@ -376,8 +457,10 @@ def getscan(
     elif scan_ids!=[]:
         for si in scan_ids:
             picked_scans.extend([s for s in all_scan_types if si == s[2]])
+
     else:
-        raise ValueError('e> unspecified scans to download!')
+        log.info('using all scans')
+        picked_scans = all_scan_types
 
 
     for scn in picked_scans:
@@ -388,8 +471,13 @@ def getscan(
 
         s_type_id = sid+'_'+stype
 
+        log.info('''SCAN:
+                \r   scant type: {}
+                \r   quality: {}
+                \r   ID: {}'''.format(stype, quality, sid))
+
         entries = get_list(
-            xc['sbjs']+'/' +sbjix+ '/experiments/' + expt['ID'] + '/scans/'+sid+'/resources',
+            xc['sbj']+'/' +sbjix+ '/experiments/' + expid + '/scans/'+sid+'/resources',
             cookie=cookie
         )
 
@@ -400,33 +488,49 @@ def getscan(
                 out[s_type_id] = []
 
                 files = get_list(
-                        xc['sbjs']+'/' +sbjix+ '/experiments/' + expt['ID'] \
+                        xc['sbj']+'/' +sbjix+ '/experiments/' + expid \
                             + '/scans/'+sid+'/resources/'+ e['format']+ '/files',
                         cookie=cookie
                         )
 
                 #> scan path
-                spth = os.path.join( opth,  s_type_id+'_q-'+quality)
+                if output_quality:
+                    spth = os.path.join( opth,  s_type_id+'_q-'+quality)
+                else:
+                    spth = os.path.join( opth,  s_type_id)
                 create_dir(spth)
 
-                #> download all files
-                for i in range(len(files)):
-                    
-                    fname = 'scan-'+s_type_id+'_q-'+quality+'_'+fcomment\
-                            +'.'+files[i]['Name'].split('.',1)[-1]
-
-                    status = get_file(
-                        xc['url']+files[i]['URI'],
-                        os.path.join(spth, fname),
-                        cookie=cookie)
-
-                    if status<0:
-                        print('e> no scan data for', scntype)
-                    else:
-                        out[s_type_id].append(os.path.join(spth, fname))
                 
-                if len(files)<1: 
-                    print('e> no scan data for', scntype)
+                if info_only:
+                    out[s_type_id] = files
+
+                #> download all files in every scan as requested
+                else:
+                    for i in range(len(files)):
+                        
+                        if output_quality:
+                            fname = 'scan-'+s_type_id+'_q-'+quality+fcomment\
+                                +'.'+files[i]['Name'].split('.',1)[-1]
+                        else:
+                            fname = 'scan-'+s_type_id+fcomment\
+                                +'.'+files[i]['Name'].split('.',1)[-1]
+
+                        status = get_file(
+                            xc['url']+files[i]['URI'],
+                            os.path.join(spth, fname),
+                            cookie=cookie,
+                            Cnt=Cnt)
+
+                        if status<0:
+                            log.error('no scan data for {}'.format(scntype))
+                        else:
+                            out[s_type_id].append(os.path.join(spth, fname))
+                    
+                    if len(files)<1: 
+                        log.error('no scan data for {}'.format(scntype))
+
+    log.info('file information is contained in the output dictionary.')
+    return out
 #===============================================================================
 
 
@@ -483,6 +587,10 @@ def getresources(
             elif '.ima' in rfiles[i]['Name'].lower():
                 if 'ima' not in out: out['ima'] = []
                 out['ima'].append(os.path.join(opth, rfiles[i]['Name']))
+            elif '.nii' in rfiles[i]['Name'].lower():
+                if 'nii' not in out: out['ima'] = []
+                out['nii'].append(os.path.join(opth, rfiles[i]['Name']))
+
         
         else:
             status = get_file(
@@ -503,6 +611,9 @@ def getresources(
                 elif '.ima' in rfiles[i]['Name'].lower():
                     if 'ima' not in out: out['ima'] = []
                     out['ima'].append(os.path.join(opth, rfiles[i]['Name']))
+                elif '.nii' in rfiles[i]['Name'].lower():
+                    if 'nii' not in out: out['nii'] = []
+                    out['nii'].append(os.path.join(opth, rfiles[i]['Name']))
                 
     if len(rfiles)<1:
         print('e> requested resources data is missing.')

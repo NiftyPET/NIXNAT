@@ -66,8 +66,10 @@ def establish_connection(
 
     #> establish a single session with a cookie to reuse it
     sessionID = xnat.post_data(xc['url']+'/data/JSESSIONID', '', usrpwd=xc['usrpwd'])
-    cookie = 'JSESSIONID='+sessionID
-
-    xc['cookie'] = cookie
+    if 'Error' in  sessionID or 'error' in  sessionID or 'failed' in  sessionID:
+        raise ValueError('Login failed!')
+    else:
+        cookie = 'JSESSIONID='+sessionID
+        xc['cookie'] = cookie
 
     return xc

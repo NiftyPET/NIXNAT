@@ -18,3 +18,7 @@ from .xnat.xnat import put_file
 
 from .xnat.xnat import post_data
 from .xnat.xnat import dcminfo
+from .xnat.xnat import time_stamp
+
+from .xnat.xnat import getscan
+from .xnat.xnat import getresources
