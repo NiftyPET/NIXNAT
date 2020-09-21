@@ -32,10 +32,9 @@ setup(
     long_description=long_description,
     author='Pawel J. Markiewicz',
     author_email='p.markiewicz@ucl.ac.uk',
-    url='https://github.com/pjmark/NiftyPET',
+    url='https://github.com/NiftyPET/NIXNAT',
     keywords='XNAT input output',
-    install_requires=['pydicom'],
+    install_requires=['pydicom', 'pycurl'],
     packages=find_packages(exclude=['docs']),
-    zip_safe=False,
 )
 #===============================================================
